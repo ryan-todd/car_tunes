@@ -40,20 +40,19 @@ def draw_menu(stdscr):
     curses.init_pair(2, curses.COLOR_RED, curses.COLOR_BLACK)
     curses.init_pair(3, 3, 5)
 
-    height, width = stdscr.getmaxyx()
-
     tick = 0
     while working:
         tick = tick + 1
         sleep(0.02)
 
         if tick % 2 == 0:
+            tick = 0
             status_update = True
 
         if active_player is not None:
             if active_player.get_state() == 6:
-                next_track(False)
-                return
+                next_track(1, False, False)
+                continue
 
         if screen_update or status_update:
             height, width = stdscr.getmaxyx()
@@ -64,12 +63,12 @@ def draw_menu(stdscr):
             stdscr.clear()
 
             display_weight_total = display_weight_artist + display_weight_album + display_weight_track
-            artist_x = 0
-            album_x = int(round((width - 2) * (display_weight_album / display_weight_total)))
-            track_x = int(round((width - 2) * ((display_weight_album + display_weight_album) / display_weight_total)))
-            artist_w = album_x - 1
+            artist_x = 1
+            album_x = int(round((width - 4) * (display_weight_album / display_weight_total)))
+            track_x = int(round((width - 4) * ((display_weight_album + display_weight_album) / display_weight_total)))
+            artist_w = album_x - 2
             album_w = track_x - (album_x + 1)
-            track_w = width - track_x
+            track_w = (width - 1) - track_x
 
             mid_y = int(height//2) - (1 if (height % 2) == 0 else 0)
             lines_above = mid_y - 3
@@ -81,12 +80,13 @@ def draw_menu(stdscr):
             stdscr.attron(curses.color_pair(1))
             stdscr.attron(curses.A_DIM)
 
+            y_intersections = [1, mid_y - 1, mid_y + 1, height - 2]
             hor_line = "─" * width
-            for y in 1, mid_y - 1, mid_y + 1, height - 2:
+            for y in y_intersections:
                 stdscr.addstr(y, 0, hor_line)
 
             for y in range(0, height - 1):
-                char = "┼" if y in [1, mid_y - 1, mid_y + 1] else "┴" if y == (height - 2) else "│"
+                char = "┴" if y == height - 2 else "┼" if y in y_intersections else "│"
                 for x in album_x - 1, track_x - 1:
                     stdscr.addstr(y, x, char)
 
