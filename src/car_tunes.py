@@ -9,11 +9,12 @@ from os import listdir
 from os.path import isfile, join
 from time import sleep
 
-working = True
+working = False
 screen_update = True
 status_update = True
 is_playing = True
-music_dir = "C:\\Users\\RyanT\\Documents\\Personal\\music\\Converted Library"
+music_dir = ""
+state_file = ""
 loaded_artists = []
 loaded_albums = []
 loaded_tracks = []
@@ -252,6 +253,49 @@ def load_track():
     active_player.play()
     is_playing = True
     screen_update = True
+    if working:
+        save_state(True);
+
+def load_state():
+    global artist_index
+    global album_index
+    global track_index
+
+    try:
+        file = open(state_file, "r")
+    except (FileNotFoundError):
+        return
+
+    lines = file.readlines()
+    file.close()
+
+    if not len(lines) == 3:
+        return
+
+    loaded_artist = lines[0][:-1] if len(lines[0]) > 0 else ""
+    loaded_album = lines[1][:-1] if len(lines[1]) > 0 else ""
+    loaded_track = lines[2][:-1] if len(lines[2]) > 0 else ""
+    if loaded_artist in loaded_artists:
+        artist_index = loaded_artists.index(loaded_artist)
+        load_albums(False, False)
+        if loaded_album in loaded_albums:
+            album_index = loaded_albums.index(loaded_album)
+            load_tracks(False)
+            if loaded_track in loaded_tracks:
+                track_index = loaded_tracks.index(loaded_track)
+                load_track()
+
+def save_state(ignore_errors):
+    try:
+        file = open(state_file, "w")
+        file.write(loaded_artists[artist_index] + "\n")
+        file.write(loaded_albums[album_index] + "\n")
+        file.write(loaded_tracks[track_index] + "\n")
+        file.close()
+    except:
+        print("Warning: Could not save state!")
+        if not ignore_errors:
+            raise
 
 def pause_track_toggle():
     global is_playing
@@ -269,11 +313,31 @@ def sorted_nicely(l):
     return sorted(l, key = alphanum_key)
 
 def main():
+    global working
+    global music_dir
+    global state_file
+    if not len(sys.argv) == 3:
+        print("Usage:")
+        print("    car_tunes.py <music_path> <state_file> ")
+        print("")
+        print("'music_path':")
+        print("    Path to directory that contains music in the format artists/albums/tracks")
+        print("")
+        print("'state_file':")
+        print("    Path to file to store state between runs")
+        return
+
+    music_dir = sys.argv[1]
+    state_file = sys.argv[2]
+
     stdscr = curses.initscr()
     stdscr.keypad(1)
 
     load_artists()
+    load_state()
+    save_state(False)
 
+    working = True
     t = threading.Thread(name ='daemon', target=input_worker, args=(stdscr,))
     t.setDaemon(True)
     t.start()
