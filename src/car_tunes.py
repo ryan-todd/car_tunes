@@ -1,6 +1,7 @@
 import curses
 import re
 import RPi.GPIO as GPIO
+import subprocess
 import sys,os
 import time
 import threading
@@ -25,6 +26,7 @@ track_index = 0
 vlc_instance = None
 active_player = None
 gpio_bouncetime = 200
+backlight_on = True
 
 gpio_artist_up = 36
 gpio_artist_down = 33
@@ -225,8 +227,19 @@ def input_worker(stdscr):
         elif c == ord('z'):
             working = False
             GPIO.cleanup()
+            backlight_on()
         elif c == ord('p'):
             pause_track_toggle()
+        elif c == ord('l'):
+            toggle_backlight()
+
+def toggle_backlight():
+    global backlight_on
+    backlight_on = not backlight_on
+    if backlight_on:
+        subprocess.call("backlight_on.sh")
+    else:
+        subprocess.call("backlight_off.sh")
 
 def load_artists():
     global loaded_artists

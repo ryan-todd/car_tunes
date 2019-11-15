@@ -25,3 +25,13 @@ Auto-login on startup is configured through `sudo raspi-config`:
 - Desktop/CLI
 - Console Autologin
 
+Include scripts for controlling backlight:
+- `/usr/local/bin/backlight_on.sh`:
+```
+sudo -E sh -c 'echo 0 > /sys/class/backlight/rpi_backlight/bl_power'
+```
+
+- `/usr/local/bin/backlight_off.sh`:
+```
+sudo -E sh -c 'echo 1 > /sys/class/backlight/rpi_backlight/bl_power'
+```
