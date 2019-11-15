@@ -1,5 +1,6 @@
 import curses
 import re
+import RPi.GPIO as GPIO
 import sys,os
 import time
 import threading
@@ -23,6 +24,15 @@ album_index = 0
 track_index = 0
 vlc_instance = None
 active_player = None
+gpio_bouncetime = 200
+
+gpio_artist_up = 36
+gpio_artist_down = 33
+gpio_album_up = 32
+gpio_album_down = 29
+gpio_track_up = 22
+gpio_track_down = 16
+gpio_play_pause = 13
 
 def draw_menu(stdscr):
     global working
@@ -214,6 +224,7 @@ def input_worker(stdscr):
             next_track(1, False, False)
         elif c == ord('z'):
             working = False
+            GPIO.cleanup()
         elif c == ord('p'):
             pause_track_toggle()
 
@@ -319,6 +330,7 @@ def main():
     global music_dir
     global state_file
     global vlc_instance
+    global gpio_bouncetime
     if not len(sys.argv) == 3:
         print("Usage:")
         print("    car_tunes.py <music_path> <state_file> ")
@@ -332,6 +344,20 @@ def main():
 
     music_dir = sys.argv[1]
     state_file = sys.argv[2]
+
+    GPIO.setwarnings(True)
+    GPIO.setmode(GPIO.BOARD)
+
+    for pin in gpio_artist_up, gpio_artist_down, gpio_album_up, gpio_album_down, gpio_track_up, gpio_track_down, gpio_play_pause:
+        GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+
+    GPIO.add_event_detect(gpio_artist_up, GPIO.RISING, callback=lambda c: next_artist(-1, False, False), bouncetime = gpio_bouncetime)
+    GPIO.add_event_detect(gpio_artist_down, GPIO.RISING, callback=lambda c: next_artist(1, False, False), bouncetime = gpio_bouncetime)
+    GPIO.add_event_detect(gpio_album_up, GPIO.RISING, callback=lambda c: next_album(-1, True, False), bouncetime = gpio_bouncetime)
+    GPIO.add_event_detect(gpio_album_down, GPIO.RISING, callback=lambda c: next_album(1, False, False), bouncetime = gpio_bouncetime)
+    GPIO.add_event_detect(gpio_track_up, GPIO.RISING, callback=lambda c: next_track(-1, True, True), bouncetime = gpio_bouncetime)
+    GPIO.add_event_detect(gpio_track_down, GPIO.RISING, callback=lambda c: next_track(1, False, False), bouncetime = gpio_bouncetime)
+    GPIO.add_event_detect(gpio_play_pause, GPIO.RISING, callback=lambda c: pause_track_toggle(), bouncetime = gpio_bouncetime)
 
     stdscr = curses.initscr()
     stdscr.keypad(1)
