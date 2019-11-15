@@ -21,6 +21,7 @@ loaded_tracks = []
 artist_index = 0
 album_index = 0
 track_index = 0
+vlc_instance = None
 active_player = None
 
 def draw_menu(stdscr):
@@ -242,6 +243,7 @@ def load_tracks(reverse_track):
     load_track()
 
 def load_track():
+    global vlc_instance
     global active_player
     global is_playing
     global screen_update
@@ -249,7 +251,7 @@ def load_track():
         active_player.stop()
 
     path = join(music_dir, loaded_artists[artist_index], loaded_albums[album_index], loaded_tracks[track_index])
-    active_player = vlc.MediaPlayer(path)
+    active_player = vlc.MediaPlayer(vlc_instance, path)
     active_player.play()
     is_playing = True
     screen_update = True
@@ -316,6 +318,7 @@ def main():
     global working
     global music_dir
     global state_file
+    global vlc_instance
     if not len(sys.argv) == 3:
         print("Usage:")
         print("    car_tunes.py <music_path> <state_file> ")
@@ -332,6 +335,8 @@ def main():
 
     stdscr = curses.initscr()
     stdscr.keypad(1)
+
+    vlc_instance = vlc.Instance("--quiet")
 
     load_artists()
     load_state()
