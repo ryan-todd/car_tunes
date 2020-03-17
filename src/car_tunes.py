@@ -35,6 +35,7 @@ gpio_album_down = 29
 gpio_track_up = 22
 gpio_track_down = 16
 gpio_play_pause = 13
+gpio_shutdown = 5
 
 def draw_menu(stdscr):
     global working
@@ -332,6 +333,9 @@ def pause_track_toggle():
     active_player.pause()
     is_playing = not is_playing
     status_update = True
+    
+def do_shutdown():
+    subprocess.call(['sudo', 'shutdown', '-h', 'now'], shell=False)
 
 def sorted_nicely(l):
     convert = lambda text: int(text) if text.isdigit() else text
@@ -361,9 +365,11 @@ def main():
     GPIO.setwarnings(True)
     GPIO.setmode(GPIO.BOARD)
 
+    GPIO.setup(gpio_shutdown, GPIO.IN, pull_up_down=GPIO.PUD_UP)
     for pin in gpio_artist_up, gpio_artist_down, gpio_album_up, gpio_album_down, gpio_track_up, gpio_track_down, gpio_play_pause:
         GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 
+    GPIO.add_event_detect(gpio_shutdown, GPIO.FALLING, callback=lambda c: do_shutdown(), bouncetime = gpio_bouncetime)
     GPIO.add_event_detect(gpio_artist_up, GPIO.RISING, callback=lambda c: next_artist(-1, False, False), bouncetime = gpio_bouncetime)
     GPIO.add_event_detect(gpio_artist_down, GPIO.RISING, callback=lambda c: next_artist(1, False, False), bouncetime = gpio_bouncetime)
     GPIO.add_event_detect(gpio_album_up, GPIO.RISING, callback=lambda c: next_album(-1, True, False), bouncetime = gpio_bouncetime)
