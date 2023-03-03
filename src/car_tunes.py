@@ -28,12 +28,12 @@ active_player = None
 gpio_bouncetime = 200
 backlight_on = True
 
-gpio_artist_up = 36
+gpio_artist_up = 29
 gpio_artist_down = 33
 gpio_album_up = 32
-gpio_album_down = 29
-gpio_track_up = 22
-gpio_track_down = 16
+gpio_album_down = 36
+gpio_track_up = 16
+gpio_track_down = 22
 gpio_play_pause = 13
 gpio_shutdown = 5
 gpio_backlight = 11
