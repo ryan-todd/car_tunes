@@ -20,6 +20,7 @@ from curses import wrapper
 from enum import Enum
 from os import listdir
 from os.path import isfile, join
+from threading import Timer
 from time import sleep
 
 working = False
@@ -36,7 +37,8 @@ album_index = 0
 track_index = 0
 vlc_instance = None
 active_player = None
-gpio_bouncetime = 200
+gpio_bouncetime_rocker = 100
+gpio_bouncetime_push = 250
 backlight_on = True
 
 gpio_artist_up = 29
@@ -58,6 +60,11 @@ class InputAction(Enum):
     TRACK_UP = 5
     TRACK_DOWN = 6
     PAUSE_PLAY = 7
+
+input_timer = None
+current_action = InputAction.NONE
+input_action_timer_delay_initial = 0.4
+input_action_timer_delay = 0.2
 
 def draw_menu(stdscr):
     global working
@@ -83,7 +90,6 @@ def draw_menu(stdscr):
         sleep(0.02)
 
         if tick % 2 == 0:
-            tick = 0
             status_update = True
 
         if active_player is not None:
@@ -225,63 +231,63 @@ def next_artist(direction, reverse_album, reverse_track):
     artist_index = (artist_index + (len(loaded_artists) + direction)) % len(loaded_artists)
     load_albums(reverse_album, reverse_track)
 
-def handle_input_action(action, engaged):
+def do_input_action(action):
     if action == InputAction.ARTIST_UP:
-        if engaged:
-            next_artist(-1, False, False)
+        next_artist(-1, False, False)
     elif action == InputAction.ARTIST_DOWN:
-        if engaged:
-            next_artist(1, False, False)
+        next_artist(1, False, False)
     elif action == InputAction.ALBUM_UP:
-        if engaged:
-            next_album(-1, True, False)
+        next_album(-1, True, False)
     elif action == InputAction.ALBUM_DOWN:
-        if engaged:
-            next_album(1, False, False)
+        next_album(1, False, False)
     elif action == InputAction.TRACK_UP:
-        if engaged:
-            next_track(-1, True, True)
+        next_track(-1, True, True)
     elif action == InputAction.TRACK_DOWN:
-        if engaged:
-            next_track(1, False, False)
+        next_track(1, False, False)
     elif action == InputAction.PAUSE_PLAY:
-        if engaged:
-            pause_track_toggle()
+        pause_track_toggle()
+
+def input_timer_tick(action):
+    global input_timer
+
+    do_input_action(action)
+    input_timer = Timer(input_action_timer_delay, input_timer_tick, [action])
+    input_timer.start()
+
+def handle_held_input_action(action):
+    global current_action
+    global input_timer
+
+    if (action == current_action):
+        input_timer.cancel()
+        current_action = InputAction.NONE
+        return
+
+    current_action = action
+    do_input_action(action)
+
+    if input_timer is not None:
+        input_timer.cancel()
+
+    input_timer = Timer(input_action_timer_delay_initial, input_timer_tick, [action])
+    input_timer.start()
     
-    if not engaged:
-        print("^")
 
 def press(key):
     if key == 'q':
-        handle_input_action(InputAction.ARTIST_UP, True)
+        handle_held_input_action(InputAction.ARTIST_UP)
     elif key == 'a':
-        handle_input_action(InputAction.ARTIST_DOWN, True)
+        handle_held_input_action(InputAction.ARTIST_DOWN)
     elif key == 'w':
-        handle_input_action(InputAction.ALBUM_UP, True)
+        handle_held_input_action(InputAction.ALBUM_UP)
     elif key == 's':
-        handle_input_action(InputAction.ALBUM_DOWN, True)
+        handle_held_input_action(InputAction.ALBUM_DOWN)
     elif key == 'e':
-        handle_input_action(InputAction.TRACK_UP, True)
+        handle_held_input_action(InputAction.TRACK_UP)
     elif key == 'd':
-        handle_input_action(InputAction.TRACK_DOWN, True)
+        handle_held_input_action(InputAction.TRACK_DOWN)
     elif key == 'p':
-        handle_input_action(InputAction.PAUSE_PLAY, True)
-
-def release(key):
-    if key == 'q':
-        handle_input_action(InputAction.ARTIST_UP, False)
-    elif key == 'a':
-        handle_input_action(InputAction.ARTIST_DOWN, False)
-    elif key == 'w':
-        handle_input_action(InputAction.ALBUM_UP, False)
-    elif key == 's':
-        handle_input_action(InputAction.ALBUM_DOWN, False)
-    elif key == 'e':
-        handle_input_action(InputAction.TRACK_UP, False)
-    elif key == 'd':
-        handle_input_action(InputAction.TRACK_DOWN, False)
-    elif key == 'p':
-        handle_input_action(InputAction.PAUSE_PLAY, False)
+        do_input_action(InputAction.PAUSE_PLAY)
 
 def input_worker(stdscr):
     global working
@@ -291,7 +297,7 @@ def input_worker(stdscr):
 
     listen_keyboard(
         on_press=press,
-        on_release=release,
+        on_release=press,
     )
 
 def toggle_backlight():
@@ -307,7 +313,7 @@ def load_artists():
     global artist_index
     artist_index = 0
     artist_dir = music_dir
-    loaded_artists = sorted_nicely([f for f in listdir(artist_dir) if not isfile(join(artist_dir, f))])
+    loaded_artists = sorted_nicely([f for f in listdir(artist_dir) if not isfile(join(artist_dir, f)) and f != "System Volume Information"])
     load_albums(False, False)
 
 def load_albums(reverse_album, reverse_track):
@@ -433,15 +439,16 @@ def main():
     for pin in gpio_artist_up, gpio_artist_down, gpio_album_up, gpio_album_down, gpio_track_up, gpio_track_down, gpio_play_pause:
         RPi.GPIO.setup(pin, RPi.GPIO.IN, pull_up_down=RPi.GPIO.PUD_DOWN)
 
-    RPi.GPIO.add_event_detect(gpio_backlight, RPi.GPIO.FALLING, callback=lambda c: toggle_backlight(), bouncetime = gpio_bouncetime)
-    RPi.GPIO.add_event_detect(gpio_shutdown, RPi.GPIO.FALLING, callback=lambda c: do_shutdown(), bouncetime = gpio_bouncetime)
-    RPi.GPIO.add_event_detect(gpio_artist_up, RPi.GPIO.RISING, callback=lambda c: handle_input_action(InputAction.ARTIST_UP, True), bouncetime = gpio_bouncetime)
-    RPi.GPIO.add_event_detect(gpio_artist_down, RPi.GPIO.RISING, callback=lambda c: handle_input_action(InputAction.ARTIST_DOWN, True), bouncetime = gpio_bouncetime)
-    RPi.GPIO.add_event_detect(gpio_album_up, RPi.GPIO.RISING, callback=lambda c: handle_input_action(InputAction.ALBUM_UP, True), bouncetime = gpio_bouncetime)
-    RPi.GPIO.add_event_detect(gpio_album_down, RPi.GPIO.RISING, callback=lambda c: handle_input_action(InputAction.ALBUM_DOWN, True), bouncetime = gpio_bouncetime)
-    RPi.GPIO.add_event_detect(gpio_track_up, RPi.GPIO.RISING, callback=lambda c: handle_input_action(InputAction.TRACK_UP, True), bouncetime = gpio_bouncetime)
-    RPi.GPIO.add_event_detect(gpio_track_down, RPi.GPIO.RISING, callback=lambda c: handle_input_action(InputAction.TRACK_DOWN, True), bouncetime = gpio_bouncetime)
-    RPi.GPIO.add_event_detect(gpio_play_pause, RPi.GPIO.RISING, callback=lambda c: handle_input_action(InputAction.PAUSE_PLAY, True), bouncetime = gpio_bouncetime)
+    RPi.GPIO.add_event_detect(gpio_backlight, RPi.GPIO.FALLING, callback=lambda c: toggle_backlight(), bouncetime = gpio_bouncetime_push)
+    RPi.GPIO.add_event_detect(gpio_shutdown, RPi.GPIO.FALLING, callback=lambda c: do_shutdown(), bouncetime = gpio_bouncetime_push)
+
+    RPi.GPIO.add_event_detect(gpio_artist_up, RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(InputAction.ARTIST_UP), bouncetime = gpio_bouncetime_rocker)
+    RPi.GPIO.add_event_detect(gpio_artist_down, RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(InputAction.ARTIST_DOWN), bouncetime = gpio_bouncetime_rocker)
+    RPi.GPIO.add_event_detect(gpio_album_up, RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(InputAction.ALBUM_UP), bouncetime = gpio_bouncetime_rocker)
+    RPi.GPIO.add_event_detect(gpio_album_down, RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(InputAction.ALBUM_DOWN), bouncetime = gpio_bouncetime_rocker)
+    RPi.GPIO.add_event_detect(gpio_track_up, RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(InputAction.TRACK_UP), bouncetime = gpio_bouncetime_rocker)
+    RPi.GPIO.add_event_detect(gpio_track_down, RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(InputAction.TRACK_DOWN), bouncetime = gpio_bouncetime_rocker)
+    RPi.GPIO.add_event_detect(gpio_play_pause, RPi.GPIO.BOTH, callback=lambda c: do_input_action(InputAction.PAUSE_PLAY), bouncetime = gpio_bouncetime_push)
 
     stdscr = curses.initscr()
     stdscr.keypad(1)
