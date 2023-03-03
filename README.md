@@ -16,8 +16,8 @@ Python packages with `pip3 install ...`:
 
 Auto-running on start-up is achieved by adding the following to `~/.bashrc`:
 ```
-sudo mount /dev/sda1 /mnt
-python3 ~/car_tunes.py /mnt ~/tmp
+sudo mount -o ro /dev/sda1 /mnt
+python3 ~/car_tunes.py /mnt ~/status
 ```
 
 Auto-login on startup is configured through `sudo raspi-config`:
