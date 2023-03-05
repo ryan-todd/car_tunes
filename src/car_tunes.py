@@ -40,28 +40,20 @@ gpio_bouncetime_rocker = 100
 gpio_bouncetime_push = 250
 backlight_on = True
 
-gpio_artist_up = 29
-gpio_artist_down = 33
-gpio_album_up = 32
-gpio_album_down = 36
-gpio_track_up = 16
-gpio_track_down = 22
-gpio_play_pause = 13
-gpio_shutdown = 5
-gpio_backlight = 11
-
-class InputAction(Enum):
+class GpioAction(Enum):
     NONE = 0
-    ARTIST_UP = 1
-    ARTIST_DOWN = 2
-    ALBUM_UP = 3
-    ALBUM_DOWN = 4
-    TRACK_UP = 5
-    TRACK_DOWN = 6
-    PAUSE_PLAY = 7
+    ARTIST_UP = 29
+    ARTIST_DOWN = 33
+    ALBUM_UP = 32
+    ALBUM_DOWN = 36
+    TRACK_UP = 16
+    TRACK_DOWN = 22
+    PAUSE_PLAY = 13
+    BACKLIGHT = 11
+    SHUTDOWN = 5
 
 input_timer = None
-current_action = InputAction.NONE
+current_action = GpioAction.NONE
 input_action_timer_delay_initial = 0.4
 input_action_timer_delay = 0.2
 
@@ -231,19 +223,19 @@ def next_artist(direction, reverse_album, reverse_track):
     load_albums(reverse_album, reverse_track)
 
 def do_input_action(action):
-    if action == InputAction.ARTIST_UP:
+    if action == GpioAction.ARTIST_UP:
         next_artist(-1, False, False)
-    elif action == InputAction.ARTIST_DOWN:
+    elif action == GpioAction.ARTIST_DOWN:
         next_artist(1, False, False)
-    elif action == InputAction.ALBUM_UP:
+    elif action == GpioAction.ALBUM_UP:
         next_album(-1, True, False)
-    elif action == InputAction.ALBUM_DOWN:
+    elif action == GpioAction.ALBUM_DOWN:
         next_album(1, False, False)
-    elif action == InputAction.TRACK_UP:
+    elif action == GpioAction.TRACK_UP:
         next_track(-1, True, True)
-    elif action == InputAction.TRACK_DOWN:
+    elif action == GpioAction.TRACK_DOWN:
         next_track(1, False, False)
-    elif action == InputAction.PAUSE_PLAY:
+    elif action == GpioAction.PAUSE_PLAY:
         pause_track_toggle()
 
 def input_timer_tick(action):
@@ -259,7 +251,7 @@ def handle_held_input_action(action):
 
     if (action == current_action):
         input_timer.cancel()
-        current_action = InputAction.NONE
+        current_action = GpioAction.NONE
         return
 
     current_action = action
@@ -436,21 +428,21 @@ def main():
     RPi.GPIO.setwarnings(True)
     RPi.GPIO.setmode(RPi.GPIO.BOARD)
 
-    RPi.GPIO.setup(gpio_backlight, RPi.GPIO.IN, pull_up_down=RPi.GPIO.PUD_UP)
-    RPi.GPIO.setup(gpio_shutdown, RPi.GPIO.IN, pull_up_down=RPi.GPIO.PUD_UP)
-    for pin in gpio_artist_up, gpio_artist_down, gpio_album_up, gpio_album_down, gpio_track_up, gpio_track_down, gpio_play_pause:
+    RPi.GPIO.setup(GpioAction.BACKLIGHT, RPi.GPIO.IN, pull_up_down=RPi.GPIO.PUD_UP)
+    RPi.GPIO.setup(GpioAction.SHUTDOWN, RPi.GPIO.IN, pull_up_down=RPi.GPIO.PUD_UP)
+    for pin in GpioAction.ARTIST_UP, GpioAction.ARTIST_DOWN, GpioAction.ALBUM_UP, GpioAction.ALBUM_DOWN, GpioAction.TRACK_UP, GpioAction.TRACK_DOWN, GpioAction.PAUSE_PLAY:
         RPi.GPIO.setup(pin, RPi.GPIO.IN, pull_up_down=RPi.GPIO.PUD_DOWN)
 
-    RPi.GPIO.add_event_detect(gpio_backlight, RPi.GPIO.FALLING, callback=lambda c: toggle_backlight(), bouncetime = gpio_bouncetime_push)
-    RPi.GPIO.add_event_detect(gpio_shutdown, RPi.GPIO.FALLING, callback=lambda c: do_shutdown(), bouncetime = gpio_bouncetime_push)
+    RPi.GPIO.add_event_detect(GpioAction.BACKLIGHT, RPi.GPIO.FALLING, callback=lambda c: toggle_backlight(), bouncetime = gpio_bouncetime_push)
+    RPi.GPIO.add_event_detect(GpioAction.SHUTDOWN, RPi.GPIO.FALLING, callback=lambda c: do_shutdown(), bouncetime = gpio_bouncetime_push)
 
-    RPi.GPIO.add_event_detect(gpio_artist_up, RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(InputAction.ARTIST_UP), bouncetime = gpio_bouncetime_rocker)
-    RPi.GPIO.add_event_detect(gpio_artist_down, RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(InputAction.ARTIST_DOWN), bouncetime = gpio_bouncetime_rocker)
-    RPi.GPIO.add_event_detect(gpio_album_up, RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(InputAction.ALBUM_UP), bouncetime = gpio_bouncetime_rocker)
-    RPi.GPIO.add_event_detect(gpio_album_down, RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(InputAction.ALBUM_DOWN), bouncetime = gpio_bouncetime_rocker)
-    RPi.GPIO.add_event_detect(gpio_track_up, RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(InputAction.TRACK_UP), bouncetime = gpio_bouncetime_rocker)
-    RPi.GPIO.add_event_detect(gpio_track_down, RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(InputAction.TRACK_DOWN), bouncetime = gpio_bouncetime_rocker)
-    RPi.GPIO.add_event_detect(gpio_play_pause, RPi.GPIO.BOTH, callback=lambda c: do_input_action(InputAction.PAUSE_PLAY), bouncetime = gpio_bouncetime_push)
+    RPi.GPIO.add_event_detect(GpioAction.ARTIST_UP, RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(GpioAction.ARTIST_UP), bouncetime = gpio_bouncetime_rocker)
+    RPi.GPIO.add_event_detect(GpioAction.ARTIST_DOWN, RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(GpioAction.ARTIST_DOWN), bouncetime = gpio_bouncetime_rocker)
+    RPi.GPIO.add_event_detect(GpioAction.ALBUM_UP, RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(GpioAction.ALBUM_UP), bouncetime = gpio_bouncetime_rocker)
+    RPi.GPIO.add_event_detect(GpioAction.ALBUM_DOWN, RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(GpioAction.ALBUM_DOWN), bouncetime = gpio_bouncetime_rocker)
+    RPi.GPIO.add_event_detect(GpioAction.TRACK_UP, RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(GpioAction.TRACK_UP), bouncetime = gpio_bouncetime_rocker)
+    RPi.GPIO.add_event_detect(GpioAction.TRACK_DOWN, RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(GpioAction.TRACK_DOWN), bouncetime = gpio_bouncetime_rocker)
+    RPi.GPIO.add_event_detect(GpioAction.PAUSE_PLAY, RPi.GPIO.BOTH, callback=lambda c: do_input_action(GpioAction.PAUSE_PLAY), bouncetime = gpio_bouncetime_push)
 
     stdscr = curses.initscr()
     stdscr.keypad(1)
