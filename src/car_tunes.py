@@ -3,7 +3,6 @@ running_on_rpi = True
 if not running_on_rpi:
     import sys
     import fake_rpi
-    from sshkeyboard import listen_keyboard
 
     sys.modules['RPi'] = fake_rpi.RPi
     sys.modules['RPi.GPIO'] = fake_rpi.RPi.GPIO
@@ -271,23 +270,6 @@ def handle_held_input_action(action):
 
     input_timer = Timer(input_action_timer_delay_initial, input_timer_tick, [action])
     input_timer.start()
-    
-
-def press(key):
-    if key == 'q':
-        handle_held_input_action(InputAction.ARTIST_UP)
-    elif key == 'a':
-        handle_held_input_action(InputAction.ARTIST_DOWN)
-    elif key == 'w':
-        handle_held_input_action(InputAction.ALBUM_UP)
-    elif key == 's':
-        handle_held_input_action(InputAction.ALBUM_DOWN)
-    elif key == 'e':
-        handle_held_input_action(InputAction.TRACK_UP)
-    elif key == 'd':
-        handle_held_input_action(InputAction.TRACK_DOWN)
-    elif key == 'p':
-        do_input_action(InputAction.PAUSE_PLAY)
 
 def input_worker(stdscr):
     global working
@@ -295,10 +277,30 @@ def input_worker(stdscr):
     global album_index
     global track_index
 
-    listen_keyboard(
-        on_press=press,
-        on_release=press,
-    )
+    while working:
+        c = stdscr.getch()
+        curses.flushinp()
+
+        if c == ord('q'):
+            next_artist(-1, False, False)
+        elif c == ord('a'):
+            next_artist(1, False, False)
+        elif c == ord('w'):
+            next_album(-1, True, False)
+        elif c == ord('s'):
+            next_album(1, False, False)
+        elif c == ord('e'):
+            next_track(-1, True, True)
+        elif c == ord('d'):
+            next_track(1, False, False)
+        elif c == ord('z'):
+            working = False
+            RPi.GPIO.cleanup()
+            backlight_on()
+        elif c == ord('p'):
+            pause_track_toggle()
+        elif c == ord('l'):
+            toggle_backlight()
 
 def toggle_backlight():
     global backlight_on
