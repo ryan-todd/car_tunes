@@ -16,7 +16,7 @@ import time
 import threading
 import vlc
 from curses import wrapper
-from enum import Enum
+from enum import IntEnum
 from os import listdir
 from os.path import isfile, join
 from threading import Timer
@@ -36,11 +36,11 @@ album_index = 0
 track_index = 0
 vlc_instance = None
 active_player = None
-gpio_bouncetime_rocker = 100
+gpio_bouncetime_rocker = 250
 gpio_bouncetime_push = 250
 backlight_on = True
 
-class GpioAction(Enum):
+class GpioAction(IntEnum):
     NONE = 0
     ARTIST_UP = 29
     ARTIST_DOWN = 33
@@ -54,6 +54,8 @@ class GpioAction(Enum):
 
 input_timer = None
 current_action = GpioAction.NONE
+current_action_held = False
+current_action_index = 0
 input_action_timer_delay_initial = 0.4
 input_action_timer_delay = 0.2
 
@@ -238,29 +240,42 @@ def do_input_action(action):
     elif action == GpioAction.PAUSE_PLAY:
         pause_track_toggle()
 
-def input_timer_tick(action):
+def input_timer_tick(action_index):
+    global current_action
+    global current_action_held
+    global current_action_index
     global input_timer
 
-    do_input_action(action)
-    input_timer = Timer(input_action_timer_delay, input_timer_tick, [action])
+    if current_action_index != action_index:
+        return
+
+    if not RPi.GPIO.input(int(current_action)):
+        return
+
+    current_action_held = True
+
+    do_input_action(current_action)
+    current_action_index = current_action_index + 1
+    input_timer = Timer(input_action_timer_delay, input_timer_tick, [current_action_index])
     input_timer.start()
 
 def handle_held_input_action(action):
     global current_action
+    global current_action_held
+    global current_action_index
     global input_timer
+    
+    current_action_index = current_action_index + 1
 
-    if (action == current_action):
-        input_timer.cancel()
+    if current_action_held:
         current_action = GpioAction.NONE
+        current_action_held = False
         return
 
     current_action = action
     do_input_action(action)
 
-    if input_timer is not None:
-        input_timer.cancel()
-
-    input_timer = Timer(input_action_timer_delay_initial, input_timer_tick, [action])
+    input_timer = Timer(input_action_timer_delay_initial, input_timer_tick, [current_action_index])
     input_timer.start()
 
 def input_worker(stdscr):
@@ -428,21 +443,21 @@ def main():
     RPi.GPIO.setwarnings(True)
     RPi.GPIO.setmode(RPi.GPIO.BOARD)
 
-    RPi.GPIO.setup(GpioAction.BACKLIGHT, RPi.GPIO.IN, pull_up_down=RPi.GPIO.PUD_UP)
-    RPi.GPIO.setup(GpioAction.SHUTDOWN, RPi.GPIO.IN, pull_up_down=RPi.GPIO.PUD_UP)
+    RPi.GPIO.setup(int(GpioAction.BACKLIGHT), RPi.GPIO.IN, pull_up_down=RPi.GPIO.PUD_UP)
+    RPi.GPIO.setup(int(GpioAction.SHUTDOWN), RPi.GPIO.IN, pull_up_down=RPi.GPIO.PUD_UP)
     for pin in GpioAction.ARTIST_UP, GpioAction.ARTIST_DOWN, GpioAction.ALBUM_UP, GpioAction.ALBUM_DOWN, GpioAction.TRACK_UP, GpioAction.TRACK_DOWN, GpioAction.PAUSE_PLAY:
-        RPi.GPIO.setup(pin, RPi.GPIO.IN, pull_up_down=RPi.GPIO.PUD_DOWN)
+        RPi.GPIO.setup(int(pin), RPi.GPIO.IN, pull_up_down=RPi.GPIO.PUD_DOWN)
 
-    RPi.GPIO.add_event_detect(GpioAction.BACKLIGHT, RPi.GPIO.FALLING, callback=lambda c: toggle_backlight(), bouncetime = gpio_bouncetime_push)
-    RPi.GPIO.add_event_detect(GpioAction.SHUTDOWN, RPi.GPIO.FALLING, callback=lambda c: do_shutdown(), bouncetime = gpio_bouncetime_push)
+    RPi.GPIO.add_event_detect(int(GpioAction.BACKLIGHT), RPi.GPIO.FALLING, callback=lambda c: toggle_backlight(), bouncetime = gpio_bouncetime_push)
+    RPi.GPIO.add_event_detect(int(GpioAction.SHUTDOWN), RPi.GPIO.FALLING, callback=lambda c: do_shutdown(), bouncetime = gpio_bouncetime_push)
 
-    RPi.GPIO.add_event_detect(GpioAction.ARTIST_UP, RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(GpioAction.ARTIST_UP), bouncetime = gpio_bouncetime_rocker)
-    RPi.GPIO.add_event_detect(GpioAction.ARTIST_DOWN, RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(GpioAction.ARTIST_DOWN), bouncetime = gpio_bouncetime_rocker)
-    RPi.GPIO.add_event_detect(GpioAction.ALBUM_UP, RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(GpioAction.ALBUM_UP), bouncetime = gpio_bouncetime_rocker)
-    RPi.GPIO.add_event_detect(GpioAction.ALBUM_DOWN, RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(GpioAction.ALBUM_DOWN), bouncetime = gpio_bouncetime_rocker)
-    RPi.GPIO.add_event_detect(GpioAction.TRACK_UP, RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(GpioAction.TRACK_UP), bouncetime = gpio_bouncetime_rocker)
-    RPi.GPIO.add_event_detect(GpioAction.TRACK_DOWN, RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(GpioAction.TRACK_DOWN), bouncetime = gpio_bouncetime_rocker)
-    RPi.GPIO.add_event_detect(GpioAction.PAUSE_PLAY, RPi.GPIO.BOTH, callback=lambda c: do_input_action(GpioAction.PAUSE_PLAY), bouncetime = gpio_bouncetime_push)
+    RPi.GPIO.add_event_detect(int(GpioAction.ARTIST_UP), RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(GpioAction.ARTIST_UP), bouncetime = gpio_bouncetime_rocker)
+    RPi.GPIO.add_event_detect(int(GpioAction.ARTIST_DOWN), RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(GpioAction.ARTIST_DOWN), bouncetime = gpio_bouncetime_rocker)
+    RPi.GPIO.add_event_detect(int(GpioAction.ALBUM_UP), RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(GpioAction.ALBUM_UP), bouncetime = gpio_bouncetime_rocker)
+    RPi.GPIO.add_event_detect(int(GpioAction.ALBUM_DOWN), RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(GpioAction.ALBUM_DOWN), bouncetime = gpio_bouncetime_rocker)
+    RPi.GPIO.add_event_detect(int(GpioAction.TRACK_UP), RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(GpioAction.TRACK_UP), bouncetime = gpio_bouncetime_rocker)
+    RPi.GPIO.add_event_detect(int(GpioAction.TRACK_DOWN), RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(GpioAction.TRACK_DOWN), bouncetime = gpio_bouncetime_rocker)
+    RPi.GPIO.add_event_detect(int(GpioAction.PAUSE_PLAY), RPi.GPIO.BOTH, callback=lambda c: do_input_action(GpioAction.PAUSE_PLAY), bouncetime = gpio_bouncetime_push)
 
     stdscr = curses.initscr()
     stdscr.keypad(1)
