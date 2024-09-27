@@ -44,6 +44,8 @@ loaded_tracks = []
 artist_index = 0
 album_index = 0
 track_index = 0
+is_no_albums = False
+is_no_tracks = False
 vlc_instance = None
 active_player = None
 gpio_bouncetime_rocker = 250
@@ -152,8 +154,6 @@ def draw_menu(stdscr):
             stdscr.attron(curses.color_pair(1))
             stdscr.attron(curses.A_BOLD)
 
-            left_status = "Playing" if is_playing else "Paused "
-
             if active_player is None:
                 right_status = "00:00 / 00:00"
             else:
@@ -162,14 +162,25 @@ def draw_menu(stdscr):
                 remaining = active_player.get_state()
                 right_status = ("%02d:%02d" % (c_mm, c_ss)) + (" / %02d:%02d" % (t_mm, t_ss))
 
-
-            stdscr.addstr(height - 1, 1, left_status)
+            stdscr.addstr(height - 1, 1, grab_status_message())
             stdscr.addstr(height - 1, width - (len(right_status) + 1), right_status)
 
             stdscr.attroff(curses.color_pair(1))
             stdscr.attroff(curses.A_BOLD)
 
         stdscr.refresh()
+
+def grab_status_message():
+    if is_no_albums:
+        return "No albums!"
+    
+    if is_no_tracks:
+        return "No tracks!"
+    
+    if is_playing:
+        return "Playing   "
+    
+    return "Paused    "
 
 def display_column(stdscr, x, item_w, mid_y, list_index, item_list):
     top_y = mid_y - list_index
@@ -338,8 +349,12 @@ def load_artists():
 def load_albums(reverse_album, reverse_track):
     global loaded_albums
     global album_index
+    global is_no_albums
     album_dir = join(music_dir, loaded_artists[artist_index])
     loaded_albums = sorted_nicely([f for f in listdir(album_dir) if not isfile(join(album_dir, f))])
+    is_no_albums = len(loaded_albums) == 0
+    if is_no_albums:
+        loaded_albums = [" "]
     album_index = 0 if not reverse_album else len(loaded_albums) - 1
     load_tracks(reverse_track)
 
@@ -347,8 +362,15 @@ def load_tracks(reverse_track):
     global loaded_tracks
     global track_index
     global updated
-    track_dir = join(music_dir, loaded_artists[artist_index], loaded_albums[album_index])
-    loaded_tracks = sorted_nicely([f for f in listdir(track_dir) if isfile(join(track_dir, f))])
+    global is_no_tracks
+    if not is_no_albums:
+        track_dir = join(music_dir, loaded_artists[artist_index], loaded_albums[album_index])
+        loaded_tracks = sorted_nicely([f for f in listdir(track_dir) if isfile(join(track_dir, f))])
+    
+    is_no_tracks = len(loaded_tracks) == 0
+    if is_no_albums or is_no_tracks:
+        loaded_tracks = [" "]
+
     track_index = 0 if not reverse_track else len(loaded_tracks) - 1
     load_track()
 
@@ -360,10 +382,11 @@ def load_track():
     if active_player is not None:
         active_player.stop()
 
-    path = join(music_dir, loaded_artists[artist_index], loaded_albums[album_index], loaded_tracks[track_index])
-    if running_on_rpi:
-        active_player = vlc.MediaPlayer(vlc_instance, path)
-        active_player.play()
+    if not is_no_albums and not is_no_tracks:
+        path = join(music_dir, loaded_artists[artist_index], loaded_albums[album_index], loaded_tracks[track_index])
+        if running_on_rpi:
+            active_player = vlc.MediaPlayer(vlc_instance, path)
+            active_player.play()
 
     is_playing = True
     screen_update = True
