@@ -391,7 +391,7 @@ def load_track():
     is_playing = True
     screen_update = True
     if working:
-        save_state(True);
+        save_state(True)
 
 def load_state():
     global artist_index
