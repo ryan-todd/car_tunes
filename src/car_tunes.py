@@ -54,12 +54,12 @@ backlight_on = True
 
 class GpioAction(IntEnum):
     NONE = 0
-    ARTIST_UP = 29
-    ARTIST_DOWN = 33
-    ALBUM_UP = 32
-    ALBUM_DOWN = 36
-    TRACK_UP = 16
-    TRACK_DOWN = 22
+    ARTIST_UP = 33
+    ARTIST_DOWN = 29
+    ALBUM_UP = 36
+    ALBUM_DOWN = 32
+    TRACK_UP = 22
+    TRACK_DOWN = 16
     PAUSE_PLAY = 13
     BACKLIGHT = 11
     SHUTDOWN = 5
