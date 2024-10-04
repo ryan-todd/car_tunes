@@ -61,8 +61,8 @@ class GpioAction(IntEnum):
     ALBUM_DOWN = 32
     TRACK_UP = 22
     TRACK_DOWN = 16
-    PAUSE_PLAY = 13
-    SHUFFLE = 11
+    PAUSE_PLAY = 11
+    SHUFFLE = 13
 
 input_timer = None
 current_action = GpioAction.NONE
@@ -480,11 +480,11 @@ def main():
     RPi.GPIO.setwarnings(True)
     RPi.GPIO.setmode(RPi.GPIO.BOARD)
 
-    RPi.GPIO.setup(int(GpioAction.SHUFFLE), RPi.GPIO.IN, pull_up_down=RPi.GPIO.PUD_UP)
-    for pin in GpioAction.ARTIST_UP, GpioAction.ARTIST_DOWN, GpioAction.ALBUM_UP, GpioAction.ALBUM_DOWN, GpioAction.TRACK_UP, GpioAction.TRACK_DOWN, GpioAction.PAUSE_PLAY:
+    RPi.GPIO.setup(int(GpioAction.PAUSE_PLAY), RPi.GPIO.IN, pull_up_down=RPi.GPIO.PUD_UP)
+    for pin in GpioAction.ARTIST_UP, GpioAction.ARTIST_DOWN, GpioAction.ALBUM_UP, GpioAction.ALBUM_DOWN, GpioAction.TRACK_UP, GpioAction.TRACK_DOWN, GpioAction.SHUFFLE:
         RPi.GPIO.setup(int(pin), RPi.GPIO.IN, pull_up_down=RPi.GPIO.PUD_DOWN)
 
-    RPi.GPIO.add_event_detect(int(GpioAction.SHUFFLE), RPi.GPIO.FALLING, callback=lambda c: do_shuffle(), bouncetime = gpio_bouncetime_push)
+    RPi.GPIO.add_event_detect(int(GpioAction.PAUSE_PLAY), RPi.GPIO.FALLING, callback=lambda c: do_input_action(GpioAction.PAUSE_PLAY), bouncetime = gpio_bouncetime_push)
 
     RPi.GPIO.add_event_detect(int(GpioAction.ARTIST_UP), RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(GpioAction.ARTIST_UP), bouncetime = gpio_bouncetime_rocker)
     RPi.GPIO.add_event_detect(int(GpioAction.ARTIST_DOWN), RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(GpioAction.ARTIST_DOWN), bouncetime = gpio_bouncetime_rocker)
@@ -492,7 +492,7 @@ def main():
     RPi.GPIO.add_event_detect(int(GpioAction.ALBUM_DOWN), RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(GpioAction.ALBUM_DOWN), bouncetime = gpio_bouncetime_rocker)
     RPi.GPIO.add_event_detect(int(GpioAction.TRACK_UP), RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(GpioAction.TRACK_UP), bouncetime = gpio_bouncetime_rocker)
     RPi.GPIO.add_event_detect(int(GpioAction.TRACK_DOWN), RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(GpioAction.TRACK_DOWN), bouncetime = gpio_bouncetime_rocker)
-    RPi.GPIO.add_event_detect(int(GpioAction.PAUSE_PLAY), RPi.GPIO.BOTH, callback=lambda c: do_input_action(GpioAction.PAUSE_PLAY), bouncetime = gpio_bouncetime_push)
+    RPi.GPIO.add_event_detect(int(GpioAction.SHUFFLE), RPi.GPIO.BOTH, callback=lambda c: do_shuffle(), bouncetime = gpio_bouncetime_push)
 
     stdscr = curses.initscr()
     stdscr.keypad(1)
