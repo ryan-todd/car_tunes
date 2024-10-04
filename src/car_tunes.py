@@ -18,6 +18,7 @@ if not running_on_rpi:
     sys.modules['RPi.GPIO'] = fake_rpi.RPi.GPIO
 
 import curses
+import random
 import re
 import RPi.GPIO
 import subprocess
@@ -61,7 +62,7 @@ class GpioAction(IntEnum):
     TRACK_UP = 22
     TRACK_DOWN = 16
     PAUSE_PLAY = 13
-    BACKLIGHT = 11
+    SHUFFLE = 11
 
 input_timer = None
 current_action = GpioAction.NONE
@@ -236,13 +237,13 @@ def next_album(direction, reverse_album, reverse_track):
     if album_index == (0 if direction == 1 else len(loaded_albums) - 1):
         next_artist(direction, reverse_album, reverse_track)
     else:
-        load_tracks(reverse_track)
+        load_tracks(reverse_track, False)
 
 def next_artist(direction, reverse_album, reverse_track):
     global artist_index
 
     artist_index = (artist_index + (len(loaded_artists) + direction)) % len(loaded_artists)
-    load_albums(reverse_album, reverse_track)
+    load_albums(reverse_album, reverse_track, False)
 
 def do_input_action(action):
     if action == GpioAction.ARTIST_UP:
@@ -327,7 +328,14 @@ def input_worker(stdscr):
         elif c == ord('p'):
             pause_track_toggle()
         elif c == ord('l'):
-            toggle_backlight()
+            do_shuffle()
+
+def do_shuffle():
+    global artist_index
+
+    artist_index = random.randint(0, len(loaded_artists) - 1)
+
+    load_albums(False, False, True)
 
 def toggle_backlight():
     global backlight_on
@@ -343,9 +351,9 @@ def load_artists():
     artist_index = 0
     artist_dir = music_dir
     loaded_artists = sorted_nicely([f for f in listdir(artist_dir) if not isfile(join(artist_dir, f)) and f != "System Volume Information"])
-    load_albums(False, False)
+    load_albums(False, False, False)
 
-def load_albums(reverse_album, reverse_track):
+def load_albums(reverse_album, reverse_track, is_shuffle):
     global loaded_albums
     global album_index
     global is_no_albums
@@ -354,10 +362,10 @@ def load_albums(reverse_album, reverse_track):
     is_no_albums = len(loaded_albums) == 0
     if is_no_albums:
         loaded_albums = [" "]
-    album_index = 0 if not reverse_album else len(loaded_albums) - 1
-    load_tracks(reverse_track)
+    album_index = random.randint(0, len(loaded_albums) - 1) if is_shuffle else 0 if not reverse_album else len(loaded_albums) - 1
+    load_tracks(reverse_track, is_shuffle)
 
-def load_tracks(reverse_track):
+def load_tracks(reverse_track, is_shuffle):
     global loaded_tracks
     global track_index
     global updated
@@ -370,7 +378,7 @@ def load_tracks(reverse_track):
     if is_no_albums or is_no_tracks:
         loaded_tracks = [" "]
 
-    track_index = 0 if not reverse_track else len(loaded_tracks) - 1
+    track_index = random.randint(0, len(loaded_tracks) - 1) if is_shuffle else 0 if not reverse_track else len(loaded_tracks) - 1
     load_track()
 
 def load_track():
@@ -413,10 +421,10 @@ def load_state():
     loaded_track = lines[2][:-1] if len(lines[2]) > 0 else ""
     if loaded_artist in loaded_artists:
         artist_index = loaded_artists.index(loaded_artist)
-        load_albums(False, False)
+        load_albums(False, False, False)
         if loaded_album in loaded_albums:
             album_index = loaded_albums.index(loaded_album)
-            load_tracks(False)
+            load_tracks(False, False)
             if loaded_track in loaded_tracks:
                 track_index = loaded_tracks.index(loaded_track)
                 load_track()
@@ -472,11 +480,11 @@ def main():
     RPi.GPIO.setwarnings(True)
     RPi.GPIO.setmode(RPi.GPIO.BOARD)
 
-    RPi.GPIO.setup(int(GpioAction.BACKLIGHT), RPi.GPIO.IN, pull_up_down=RPi.GPIO.PUD_UP)
+    RPi.GPIO.setup(int(GpioAction.SHUFFLE), RPi.GPIO.IN, pull_up_down=RPi.GPIO.PUD_UP)
     for pin in GpioAction.ARTIST_UP, GpioAction.ARTIST_DOWN, GpioAction.ALBUM_UP, GpioAction.ALBUM_DOWN, GpioAction.TRACK_UP, GpioAction.TRACK_DOWN, GpioAction.PAUSE_PLAY:
         RPi.GPIO.setup(int(pin), RPi.GPIO.IN, pull_up_down=RPi.GPIO.PUD_DOWN)
 
-    RPi.GPIO.add_event_detect(int(GpioAction.BACKLIGHT), RPi.GPIO.FALLING, callback=lambda c: toggle_backlight(), bouncetime = gpio_bouncetime_push)
+    RPi.GPIO.add_event_detect(int(GpioAction.SHUFFLE), RPi.GPIO.FALLING, callback=lambda c: do_shuffle(), bouncetime = gpio_bouncetime_push)
 
     RPi.GPIO.add_event_detect(int(GpioAction.ARTIST_UP), RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(GpioAction.ARTIST_UP), bouncetime = gpio_bouncetime_rocker)
     RPi.GPIO.add_event_detect(int(GpioAction.ARTIST_DOWN), RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(GpioAction.ARTIST_DOWN), bouncetime = gpio_bouncetime_rocker)
