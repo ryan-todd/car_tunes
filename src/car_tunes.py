@@ -62,7 +62,6 @@ class GpioAction(IntEnum):
     TRACK_DOWN = 16
     PAUSE_PLAY = 13
     BACKLIGHT = 11
-    SHUTDOWN = 5
 
 input_timer = None
 current_action = GpioAction.NONE
@@ -444,9 +443,6 @@ def pause_track_toggle():
         return
 
     active_player.pause()
-    
-def do_shutdown():
-    subprocess.call(['sudo', 'shutdown', '-h', 'now'], shell=False)
 
 def sorted_nicely(l):
     convert = lambda text: int(text) if text.isdigit() else text
@@ -477,12 +473,10 @@ def main():
     RPi.GPIO.setmode(RPi.GPIO.BOARD)
 
     RPi.GPIO.setup(int(GpioAction.BACKLIGHT), RPi.GPIO.IN, pull_up_down=RPi.GPIO.PUD_UP)
-    RPi.GPIO.setup(int(GpioAction.SHUTDOWN), RPi.GPIO.IN, pull_up_down=RPi.GPIO.PUD_UP)
     for pin in GpioAction.ARTIST_UP, GpioAction.ARTIST_DOWN, GpioAction.ALBUM_UP, GpioAction.ALBUM_DOWN, GpioAction.TRACK_UP, GpioAction.TRACK_DOWN, GpioAction.PAUSE_PLAY:
         RPi.GPIO.setup(int(pin), RPi.GPIO.IN, pull_up_down=RPi.GPIO.PUD_DOWN)
 
     RPi.GPIO.add_event_detect(int(GpioAction.BACKLIGHT), RPi.GPIO.FALLING, callback=lambda c: toggle_backlight(), bouncetime = gpio_bouncetime_push)
-    RPi.GPIO.add_event_detect(int(GpioAction.SHUTDOWN), RPi.GPIO.FALLING, callback=lambda c: do_shutdown(), bouncetime = gpio_bouncetime_push)
 
     RPi.GPIO.add_event_detect(int(GpioAction.ARTIST_UP), RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(GpioAction.ARTIST_UP), bouncetime = gpio_bouncetime_rocker)
     RPi.GPIO.add_event_detect(int(GpioAction.ARTIST_DOWN), RPi.GPIO.BOTH, callback=lambda c: handle_held_input_action(GpioAction.ARTIST_DOWN), bouncetime = gpio_bouncetime_rocker)
