@@ -333,7 +333,8 @@ def input_worker(stdscr):
 def do_shuffle():
     global artist_index
 
-    artist_index = random.randint(0, len(loaded_artists) - 1)
+    new_index = 0 if len(loaded_artists) == 1 else random.randint(0, len(loaded_artists) - 2)
+    artist_index = new_index if new_index < artist_index else new_index + 1
 
     load_albums(False, False, True)
 
